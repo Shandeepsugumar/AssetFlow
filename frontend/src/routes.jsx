@@ -24,6 +24,11 @@ import OrgSetup from './pages/org-setup/OrgSetup';
 // Stub pages for teammate modules
 import ComingSoon from './pages/stubs/ComingSoon';
 
+// Member 4: Audit & Reports
+import AuditScreen from './pages/audit/AuditScreen';
+import ReportsScreen from './pages/reports/ReportsScreen';
+import NotificationsScreen from './pages/notifications/NotificationsScreen';
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -122,15 +127,12 @@ export default function AppRoutes() {
           }
         />
 
-        {/* ─── Member 4: Audit & Reports (stub routes) ─── */}
+        {/* ─── Member 4: Audit & Reports ─── */}
         <Route
           path="audit"
           element={
             <ProtectedRoute requiredRoles={['Admin', 'Asset Manager']}>
-              <ComingSoon
-                title="Audit"
-                description="Audit cycle management, compliance tracking, and audit reports will be available here."
-              />
+              <AuditScreen />
             </ProtectedRoute>
           }
         />
@@ -138,10 +140,7 @@ export default function AppRoutes() {
           path="reports"
           element={
             <ProtectedRoute requiredRoles={['Admin', 'Asset Manager', 'Department Head']}>
-              <ComingSoon
-                title="Reports"
-                description="Analytics dashboards, usage reports, and data exports will be available here."
-              />
+              <ReportsScreen />
             </ProtectedRoute>
           }
         />
@@ -150,10 +149,7 @@ export default function AppRoutes() {
         <Route
           path="notifications"
           element={
-            <ComingSoon
-              title="Notifications"
-              description="System notifications, alerts, and reminders will be available here."
-            />
+            <NotificationsScreen />
           }
         />
 
