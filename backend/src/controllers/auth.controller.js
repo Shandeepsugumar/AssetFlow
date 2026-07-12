@@ -15,6 +15,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { logActivity } = require('../services/activityLog.service');
+const { sendPasswordResetEmail } = require('../services/email.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'assetflow-hackathon-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -141,18 +142,19 @@ async function forgotPassword(req, res) {
       return res.status(400).json({ success: false, data: null, error: 'Email is required' });
     }
 
-    const userResult = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    const userResult = await db.query('SELECT id, name FROM users WHERE email = $1', [email.toLowerCase().trim()]);
 
     // Always return success to prevent email enumeration
     if (userResult.rows.length === 0) {
       return res.json({
         success: true,
-        data: { message: 'If an account with that email exists, a reset link has been sent.' },
+        data: { message: 'If an account with that email exists, a reset link has been sent to your email address.' },
         error: null,
       });
     }
 
     const userId = userResult.rows[0].id;
+    const userName = userResult.rows[0].name || 'User';
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY * 60 * 1000);
 
@@ -169,15 +171,16 @@ async function forgotPassword(req, res) {
       [userId, token, expiresAt]
     );
 
-    // DEV MODE: Log and return the token directly.
-    // In production, replace this with an email service call.
-    console.log(`[Auth] Password reset token for ${email}: ${token}`);
+    // Send email using Nodemailer service
+    const emailResult = await sendPasswordResetEmail(email.toLowerCase().trim(), token, userName);
+    console.log(`[Auth] Password reset email processed for ${email}: sent=${emailResult.sent}`);
 
     res.json({
       success: true,
       data: {
-        message: 'If an account with that email exists, a reset link has been sent.',
-        // DEV ONLY — remove in production
+        message: 'If an account with that email exists, a reset link has been sent to your email address.',
+        emailSent: emailResult.sent,
+        previewUrl: emailResult.previewUrl || null,
         resetToken: token,
       },
       error: null,

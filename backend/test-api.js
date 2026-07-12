@@ -49,15 +49,16 @@ async function run() {
   const badSignup = await req('POST', '/auth/signup', { email: 'bad-email', password: '123' });
   check('Signup rejects invalid email', !badSignup.success && badSignup.error);
 
-  const newUser = await req('POST', '/auth/signup', { name: 'Test User', email: 'testuser99@assetflow.com', password: 'password123' });
+  const uniqueTestEmail = `testuser_${Date.now()}@assetflow.com`;
+  const newUser = await req('POST', '/auth/signup', { name: 'Test User', email: uniqueTestEmail, password: 'password123' });
   check('Signup creates employee', newUser.success && newUser.data?.user?.role === 'Employee' || newUser.data?.user?.role === 'employee', JSON.stringify(newUser.data?.user?.role));
   check('Signup returns token', !!newUser.data?.token);
 
   // Attempt role injection — must be blocked
-  const injected = await req('POST', '/auth/signup', { name: 'Hacker', email: 'hacker@test.com', password: 'password123', role: 'admin' });
+  const injected = await req('POST', '/auth/signup', { name: 'Hacker', email: `hacker_${Date.now()}@test.com`, password: 'password123', role: 'admin' });
   check('Signup blocks role injection (always employee)', injected.data?.user?.role === 'Employee' || injected.data?.user?.role === 'employee');
 
-  const dupSignup = await req('POST', '/auth/signup', { name: 'Test User', email: 'testuser99@assetflow.com', password: 'password123' });
+  const dupSignup = await req('POST', '/auth/signup', { name: 'Test User', email: uniqueTestEmail, password: 'password123' });
   check('Signup rejects duplicate email', !dupSignup.success);
 
   console.log('\n▸ Auth — Login');
