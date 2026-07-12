@@ -76,7 +76,7 @@ export default function Table({
           <tbody>
             {data.map((row, idx) => (
               <tr
-                key={row.id || idx}
+                key={`${row.id || 'row'}-${idx}`}
                 className={`
                   border-b border-border last:border-0
                   transition-colors duration-150
