@@ -2,14 +2,18 @@
  * ============================================================
  * AssetFlow — Database Seed Script
  * ============================================================
- * Creates a default Admin user so the app is usable on first run.
+ * REAL WORKFLOW:
+ *   1. Admin is the ONLY pre-created user.
+ *   2. All other users sign up via /api/auth/signup → they
+ *      become 'employee' automatically.
+ *   3. Admin logs in → goes to Employee Directory →
+ *      promotes any employee to Asset Manager or Dept Head.
  *
- * Default Admin credentials:
- *   Email:    admin@assetflow.com
- *   Password: admin123
- *
- * Also seeds sample departments, categories, and employees
- * for demonstration purposes.
+ * What this script seeds:
+ *   ✅ 1 Admin account
+ *   ✅ Sample departments (no heads assigned — Admin does that)
+ *   ✅ Asset categories
+ *   ✅ One welcome activity log entry
  *
  * Usage: npm run db:seed
  * ============================================================
@@ -25,120 +29,54 @@ async function seed() {
   console.log('🌱 Seeding database...');
 
   try {
-    // ── 1. Default Admin User ─────────────────────────────
+    // ── 1. Admin Account ──────────────────────────────────
+    // This is the ONLY pre-created user. Everyone else signs
+    // up themselves and starts as an Employee.
     const adminPassword = await bcrypt.hash('admin123', SALT_ROUNDS);
     const adminResult = await db.query(
       `INSERT INTO users (name, email, password_hash, role, is_active)
-       VALUES ($1, $2, $3, $4, true)
-       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+       VALUES ($1, $2, $3, 'admin', true)
+       ON CONFLICT (email) DO UPDATE
+         SET name = EXCLUDED.name,
+             password_hash = EXCLUDED.password_hash,
+             role = 'admin',
+             is_active = true
        RETURNING id`,
-      ['Rajesh Kumar', 'admin@assetflow.com', adminPassword, 'admin']
+      ['Admin', 'admin@assetflow.com', adminPassword]
     );
     const adminId = adminResult.rows[0].id;
-    console.log('  ✅ Admin user created (admin@assetflow.com / admin123)');
+    console.log('  ✅ Admin created: admin@assetflow.com / admin123');
 
-    // ── 2. Sample Departments ─────────────────────────────
-    const depts = [
-      { name: 'IT', desc: 'Information Technology & Infrastructure' },
+    // ── 2. Departments ────────────────────────────────────
+    // Department heads are NOT assigned here.
+    // Admin promotes an employee to Dept Head and then assigns
+    // them via the Org Setup page.
+    const departments = [
+      { name: 'IT',              desc: 'Information Technology & Infrastructure' },
       { name: 'Human Resources', desc: 'People Operations & Talent Management' },
-      { name: 'Finance', desc: 'Financial Planning & Accounting' },
-      { name: 'Marketing', desc: 'Brand Strategy & Digital Marketing' },
-      { name: 'Operations', desc: 'Business Operations & Logistics' },
+      { name: 'Finance',         desc: 'Financial Planning & Accounting' },
+      { name: 'Marketing',       desc: 'Brand Strategy & Digital Marketing' },
+      { name: 'Operations',      desc: 'Business Operations & Logistics' },
     ];
-    const deptIds = {};
-    for (const dept of depts) {
-      const res = await db.query(
+
+    for (const dept of departments) {
+      await db.query(
         `INSERT INTO departments (name, description, is_active)
          VALUES ($1, $2, true)
-         ON CONFLICT DO NOTHING
-         RETURNING id`,
+         ON CONFLICT DO NOTHING`,
         [dept.name, dept.desc]
       );
-      if (res.rows.length > 0) {
-        deptIds[dept.name] = res.rows[0].id;
-      }
     }
-    console.log('  ✅ Departments seeded');
+    console.log('  ✅ Departments seeded (no heads assigned — Admin decides)');
 
-    // ── 3. Sample Users ───────────────────────────────────
-    const userPassword = await bcrypt.hash('password123', SALT_ROUNDS);
-    const sampleUsers = [
-      { name: 'Anita Sharma', email: 'manager@assetflow.com', role: 'asset_manager', dept: 'Operations' },
-      { name: 'Vikram Patel', email: 'head@assetflow.com', role: 'department_head', dept: 'IT' },
-      { name: 'Priya Shah', email: 'employee@assetflow.com', role: 'employee', dept: 'Marketing' },
-      { name: 'Suresh Reddy', email: 'suresh.reddy@assetflow.com', role: 'employee', dept: 'IT' },
-      { name: 'Meera Nair', email: 'meera.nair@assetflow.com', role: 'department_head', dept: 'Human Resources' },
-      { name: 'Arjun Desai', email: 'arjun.desai@assetflow.com', role: 'employee', dept: 'Finance' },
-      { name: 'Kavita Joshi', email: 'kavita.joshi@assetflow.com', role: 'department_head', dept: 'Finance' },
-      { name: 'Rohit Mehta', email: 'rohit.mehta@assetflow.com', role: 'employee', dept: 'IT' },
-    ];
-
-    for (const u of sampleUsers) {
-      const deptId = deptIds[u.dept] || null;
-      await db.query(
-        `INSERT INTO users (name, email, password_hash, role, department_id, is_active)
-         VALUES ($1, $2, $3, $4, $5, true)
-         ON CONFLICT (email) DO NOTHING`,
-        [u.name, u.email, userPassword, u.role, deptId]
-      );
-    }
-    console.log('  ✅ Sample users seeded (all with password: password123)');
-
-    // Update admin's department
-    if (deptIds['IT']) {
-      await db.query('UPDATE users SET department_id = $1 WHERE id = $2', [deptIds['IT'], adminId]);
-    }
-
-    // ── 4. Assign Department Heads ────────────────────────
-    // Vikram → IT, Meera → HR, Kavita → Finance
-    const headAssignments = [
-      { dept: 'IT', email: 'head@assetflow.com' },
-      { dept: 'Human Resources', email: 'meera.nair@assetflow.com' },
-      { dept: 'Finance', email: 'kavita.joshi@assetflow.com' },
-    ];
-    for (const ha of headAssignments) {
-      if (deptIds[ha.dept]) {
-        const userRes = await db.query('SELECT id FROM users WHERE email = $1', [ha.email]);
-        if (userRes.rows.length > 0) {
-          await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [
-            userRes.rows[0].id,
-            deptIds[ha.dept],
-          ]);
-        }
-      }
-    }
-    console.log('  ✅ Department heads assigned');
-
-    // ── 5. Engineering dept (child of IT) ─────────────────
-    if (deptIds['IT']) {
-      const engRes = await db.query(
-        `INSERT INTO departments (name, description, parent_department_id, is_active)
-         VALUES ($1, $2, $3, true)
-         ON CONFLICT DO NOTHING
-         RETURNING id`,
-        ['Engineering', 'Product Engineering & Development', deptIds['IT']]
-      );
-      if (engRes.rows.length > 0) {
-        // Assign Vikram as head of Engineering too
-        const vikram = await db.query("SELECT id FROM users WHERE email = 'head@assetflow.com'");
-        if (vikram.rows.length > 0) {
-          await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [
-            vikram.rows[0].id,
-            engRes.rows[0].id,
-          ]);
-        }
-      }
-    }
-    console.log('  ✅ Engineering sub-department created');
-
-    // ── 6. Asset Categories ───────────────────────────────
+    // ── 3. Asset Categories ───────────────────────────────
     const categories = [
       {
         name: 'Electronics',
         desc: 'Laptops, monitors, phones, and other electronic devices',
         fields: [
           { key: 'Warranty Period', type: 'text', required: true },
-          { key: 'Serial Number Pattern', type: 'text', required: true },
+          { key: 'Serial Number',   type: 'text', required: true },
           { key: 'Operating System', type: 'text', required: false },
         ],
       },
@@ -147,16 +85,16 @@ async function seed() {
         desc: 'Desks, chairs, cabinets, and office furniture',
         fields: [
           { key: 'Material', type: 'text', required: false },
-          { key: 'Color', type: 'text', required: false },
+          { key: 'Color',    type: 'text', required: false },
         ],
       },
       {
         name: 'Vehicles',
         desc: 'Company cars, vans, and transport vehicles',
         fields: [
-          { key: 'License Plate', type: 'text', required: true },
+          { key: 'License Plate',    type: 'text', required: true },
           { key: 'Insurance Expiry', type: 'text', required: true },
-          { key: 'Fuel Type', type: 'text', required: true },
+          { key: 'Fuel Type',        type: 'text', required: true },
         ],
       },
       {
@@ -170,9 +108,9 @@ async function seed() {
         name: 'Safety Equipment',
         desc: 'Fire extinguishers, first aid kits, safety gear',
         fields: [
-          { key: 'Inspection Date', type: 'text', required: true },
+          { key: 'Inspection Date',     type: 'text', required: true },
           { key: 'Certification Number', type: 'text', required: true },
-          { key: 'Expiry Date', type: 'text', required: true },
+          { key: 'Expiry Date',         type: 'text', required: true },
         ],
       },
     ];
@@ -187,30 +125,26 @@ async function seed() {
     }
     console.log('  ✅ Asset categories seeded');
 
-    // ── 7. Sample Activity Logs ───────────────────────────
-    const logs = [
-      'Laptop AF-0114 allocated to Priya Shah',
-      'Conference Room A booked by Marketing for Jul 15',
-      'Printer PR-0023 maintenance request raised by Arjun Desai',
-      'Monitor MN-0089 transferred from IT to Engineering',
-      'Vehicle VH-003 returned by Suresh Reddy',
-      'New category "Safety Equipment" created by Admin',
-    ];
-    for (const log of logs) {
-      await db.query(
-        `INSERT INTO activity_logs (user_id, action, entity_type)
-         VALUES ($1, $2, $3)`,
-        [adminId, log, 'system']
-      );
-    }
-    console.log('  ✅ Activity logs seeded');
+    // ── 4. Welcome Activity Log ───────────────────────────
+    await db.query(
+      `INSERT INTO activity_logs (user_id, action, entity_type)
+       VALUES ($1, $2, 'system')`,
+      [adminId, 'AssetFlow system initialized by Admin']
+    );
+    console.log('  ✅ Welcome activity log created');
 
+    // ── Summary ───────────────────────────────────────────
     console.log('\n🎉 Database seeding completed successfully!');
-    console.log('\n📋 Login credentials:');
-    console.log('   Admin:           admin@assetflow.com / admin123');
-    console.log('   Asset Manager:   manager@assetflow.com / password123');
-    console.log('   Dept Head:       head@assetflow.com / password123');
-    console.log('   Employee:        employee@assetflow.com / password123');
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('  ✅ ADMIN LOGIN:');
+    console.log('     Email:    admin@assetflow.com');
+    console.log('     Password: admin123');
+    console.log('\n  ℹ️  HOW IT WORKS:');
+    console.log('     1. Other users sign up at /signup → role = Employee');
+    console.log('     2. Admin logs in → Employee Directory');
+    console.log('     3. Admin promotes users to Asset Manager / Dept Head');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
   } catch (err) {
     console.error('❌ Seeding failed:', err.message);
     process.exit(1);

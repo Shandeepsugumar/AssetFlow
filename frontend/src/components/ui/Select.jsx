@@ -32,8 +32,8 @@ export default function Select({
           {...rest}
         >
           <option value="">{placeholder}</option>
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+          {options.map((opt, idx) => (
+            <option key={opt.id || `${opt.value}-${idx}`} value={opt.value}>
               {opt.label}
             </option>
           ))}

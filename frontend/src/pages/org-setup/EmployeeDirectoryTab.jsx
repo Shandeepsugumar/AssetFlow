@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { employeesApi, departmentsApi } from '../../api/endpoints';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button, Table, Badge, Modal, Select, Input } from '../../components/ui';
 import { Search, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -9,6 +10,7 @@ const PROMOTABLE_ROLES = ['Department Head', 'Asset Manager'];
 
 export default function EmployeeDirectoryTab() {
   const toast = useToast();
+  const { user } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,17 +126,21 @@ export default function EmployeeDirectoryTab() {
       key: 'actions',
       label: 'Assign Role',
       render: (_, row) =>
-        row.role !== 'Admin' ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openPromotion(row)}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Change Role
-          </Button>
+        user?.role === 'Admin' ? (
+          row.role !== 'Admin' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openPromotion(row)}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Change Role
+            </Button>
+          ) : (
+            <span className="text-xs text-text-tertiary">Admin</span>
+          )
         ) : (
-          <span className="text-xs text-text-tertiary">Admin</span>
+          <span className="text-xs text-text-tertiary">Admin Only</span>
         ),
     },
   ];
