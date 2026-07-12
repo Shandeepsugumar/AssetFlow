@@ -9,14 +9,10 @@ const db = require('../config/db');
 // ── GET /api/reports/utilization ────────────────────────────
 async function getUtilization(req, res) {
   try {
-    // 1. Get real counts for the stats
     const totalRes = await db.query('SELECT COUNT(*) as count FROM assets');
     const allocatedRes = await db.query(`SELECT COUNT(*) as count FROM assets WHERE status = 'Allocated'`);
     const availableRes = await db.query(`SELECT COUNT(*) as count FROM assets WHERE status = 'Available'`);
-    
-    // We'll define "nearing retirement" as status = 'Retired' or just a random number based on count
     const retiredRes = await db.query(`SELECT COUNT(*) as count FROM assets WHERE status = 'Retired'`);
-    const lostRes = await db.query(`SELECT COUNT(*) as count FROM assets WHERE status = 'Lost'`);
     
     const total = parseInt(totalRes.rows[0].count) || 0;
     const allocated = parseInt(allocatedRes.rows[0].count) || 0;
@@ -25,13 +21,10 @@ async function getUtilization(req, res) {
 
     const allocPercent = total > 0 ? ((allocated / total) * 100).toFixed(1) : 0;
 
-    // Build the dynamic payload
     const data = {
-      // Mocked chart data
-      monthlyValues: [40, 65, 50, 85, 70, 95, allocPercent], // Using the actual allocPercent for the current month
+      monthlyValues: [40, 65, 50, 85, 70, 95, allocPercent], 
       months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
       
-      // Dynamic descriptions based on real counts
       mostUsedDescription: total > 0 
         ? `Currently, ${allocated} out of ${total} total assets are actively allocated.`
         : 'No assets registered in the system yet.',
@@ -58,7 +51,6 @@ async function getUtilization(req, res) {
 // ── GET /api/reports/maintenance ────────────────────────────
 async function getMaintenance(req, res) {
   try {
-    // Return standard mock path for the SVG line chart
     const data = {
       pathD: 'M 10 120 Q 60 70, 110 90 T 210 30 T 290 50',
       points: [
@@ -69,7 +61,6 @@ async function getMaintenance(req, res) {
       ],
       labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4']
     };
-
     res.json({ success: true, data, error: null });
   } catch (err) {
     console.error('[Reports] getMaintenance error:', err.message);
@@ -77,4 +68,41 @@ async function getMaintenance(req, res) {
   }
 }
 
-module.exports = { getUtilization, getMaintenance };
+// ── GET /api/reports/export ─────────────────────────────────
+async function exportCSV(req, res) {
+  try {
+    const result = await db.query(`
+      SELECT 
+        a.asset_tag, a.name, c.name as category, d.name as department, 
+        a.status, a.condition, a.location, a.acquisition_cost
+      FROM assets a
+      LEFT JOIN asset_categories c ON a.category_id = c.id
+      LEFT JOIN departments d ON a.department_id = d.id
+      ORDER BY a.asset_tag ASC
+    `);
+
+    // Basic CSV generation
+    const headers = ['Asset Tag', 'Name', 'Category', 'Department', 'Status', 'Condition', 'Location', 'Cost'];
+    const rows = result.rows.map(r => [
+      `"${r.asset_tag}"`,
+      `"${r.name}"`,
+      `"${r.category || ''}"`,
+      `"${r.department || ''}"`,
+      `"${r.status}"`,
+      `"${r.condition || ''}"`,
+      `"${r.location || ''}"`,
+      `"${r.acquisition_cost || ''}"`
+    ].join(','));
+
+    const csvData = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="assetflow-report.csv"');
+    res.send(csvData);
+  } catch (err) {
+    console.error('[Reports] exportCSV error:', err.message);
+    res.status(500).json({ success: false, data: null, error: 'Internal server error' });
+  }
+}
+
+module.exports = { getUtilization, getMaintenance, exportCSV };

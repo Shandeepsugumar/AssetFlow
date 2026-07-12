@@ -9,5 +9,6 @@ router.use(authorizeRoles('admin', 'asset_manager', 'department_head'));
 
 router.get('/utilization', reportsController.getUtilization);
 router.get('/maintenance', reportsController.getMaintenance);
+router.get('/export', reportsController.exportCSV);
 
 module.exports = router;

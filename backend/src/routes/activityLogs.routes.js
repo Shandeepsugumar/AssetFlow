@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const dashController = require('../controllers/dashboard.controller');
+const activityLogsController = require('../controllers/activityLogs.controller');
 
-// Recent activity logs — any authenticated user
-router.get('/recent', authenticateToken, dashController.getRecentActivity);
+router.get('/', authenticateToken, activityLogsController.getAllLogs);
+router.get('/recent', authenticateToken, activityLogsController.getRecentLogs);
 
 module.exports = router;

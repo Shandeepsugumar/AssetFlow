@@ -29,8 +29,20 @@ export default function ReportsScreen() {
     fetchReportsData();
   }, []);
 
-  const handleExport = () => {
-    alert('Exporting Report (CSV)...');
+  const handleExport = async () => {
+    try {
+      const response = await client.get('/reports/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'assetflow-report.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error('Failed to export report:', error);
+      alert('Failed to export report.');
+    }
   };
 
   // Determine chart values (either from backend or fallback to the sandbox design metrics)
