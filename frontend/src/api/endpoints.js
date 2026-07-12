@@ -349,3 +349,143 @@ export const employeesApi = {
     return res.data;
   },
 };
+
+// ─────────────────────────────────────────────────────────────
+// ASSETS API (FALLBACK)
+// ─────────────────────────────────────────────────────────────
+export const assetsApi = {
+  async getAll(params = {}) {
+    if (USE_MOCKS) {
+      await delay(300);
+      let list = [
+        { id: 'ast-001', assetTag: 'AST-ROOM-A', name: 'Conference Room Alpha', categoryName: 'Office Equipment', status: 'Available', isBookable: true, location: 'HQ Floor 3' },
+        { id: 'ast-002', assetTag: 'AST-VEH-01', name: 'Tesla Model 3 (Company Car)', categoryName: 'Vehicles', status: 'Available', isBookable: true, location: 'Basement Parking Slot 14' },
+        { id: 'ast-003', assetTag: 'AST-PROJ-05', name: 'Epson 4K Laser Projector', categoryName: 'Office Equipment', status: 'Available', isBookable: true, location: 'Marketing Box 4' }
+      ];
+      if (params.is_bookable !== undefined) {
+        list = list.filter(a => a.isBookable === (params.is_bookable === 'true'));
+      }
+      return { success: true, data: list, error: null };
+    }
+    const res = await client.get('/assets', { params });
+    return res.data;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// BOOKINGS API
+// ─────────────────────────────────────────────────────────────
+export const bookingsApi = {
+  async getAll(params = {}) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: [], error: null };
+    }
+    const res = await client.get('/bookings', { params });
+    return res.data;
+  },
+
+  async create(data) {
+    if (USE_MOCKS) {
+      await delay(500);
+      return { success: true, data: { id: `bk-${Date.now()}`, ...data, status: 'Upcoming' }, error: null };
+    }
+    const res = await client.post('/bookings', data);
+    return res.data;
+  },
+
+  async cancel(id) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id, status: 'Cancelled' }, error: null };
+    }
+    const res = await client.patch(`/bookings/${id}/cancel`);
+    return res.data;
+  },
+
+  async reschedule(id, data) {
+    if (USE_MOCKS) {
+      await delay(500);
+      return { success: true, data: { id, ...data, status: 'Upcoming' }, error: null };
+    }
+    const res = await client.patch(`/bookings/${id}/reschedule`, data);
+    return res.data;
+  },
+
+  async getActiveCount() {
+    if (USE_MOCKS) {
+      await delay(300);
+      return { success: true, data: { count: 3 }, error: null };
+    }
+    const res = await client.get('/bookings/active-count');
+    return res.data;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// MAINTENANCE API
+// ─────────────────────────────────────────────────────────────
+export const maintenanceApi = {
+  async getAll(params = {}) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: [], error: null };
+    }
+    const res = await client.get('/maintenance', { params });
+    return res.data;
+  },
+
+  async create(data) {
+    if (USE_MOCKS) {
+      await delay(500);
+      return { success: true, data: { id: `maint-${Date.now()}`, ...data, status: 'Pending' }, error: null };
+    }
+    const res = await client.post('/maintenance', data);
+    return res.data;
+  },
+
+  async approve(id) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id, status: 'Approved' }, error: null };
+    }
+    const res = await client.patch(`/maintenance/${id}/approve`);
+    return res.data;
+  },
+
+  async reject(id) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id, status: 'Rejected' }, error: null };
+    }
+    const res = await client.patch(`/maintenance/${id}/reject`);
+    return res.data;
+  },
+
+  async assign(id, technicianName) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id, status: 'In Progress', technicianAssigned: technicianName }, error: null };
+    }
+    const res = await client.patch(`/maintenance/${id}/assign`, { technicianName });
+    return res.data;
+  },
+
+  async resolve(id) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id, status: 'Resolved' }, error: null };
+    }
+    const res = await client.patch(`/maintenance/${id}/resolve`);
+    return res.data;
+  },
+
+  async getTodayCount() {
+    if (USE_MOCKS) {
+      await delay(300);
+      return { success: true, data: { count: 1 }, error: null };
+    }
+    const res = await client.get('/maintenance/today-count');
+    return res.data;
+  }
+};

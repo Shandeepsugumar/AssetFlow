@@ -21,6 +21,10 @@ import ResetPassword from './pages/auth/ResetPassword';
 import Dashboard from './pages/dashboard/Dashboard';
 import OrgSetup from './pages/org-setup/OrgSetup';
 
+// Member 3 pages (Bookings & Maintenance)
+import BookingsPage from './pages/bookings/BookingsPage';
+import MaintenancePage from './pages/maintenance/MaintenancePage';
+
 // Stub pages for teammate modules
 import ComingSoon from './pages/stubs/ComingSoon';
 
@@ -89,43 +93,11 @@ export default function AppRoutes() {
           }
         />
 
-        {/* ─── Member 3: Bookings & Maintenance (stub routes) ─── */}
-        <Route
-          path="bookings"
-          element={
-            <ComingSoon
-              title="Resource Booking"
-              description="Book shared resources like conference rooms, vehicles, and equipment."
-            />
-          }
-        />
-        <Route
-          path="bookings/new"
-          element={
-            <ComingSoon
-              title="Book Resource"
-              description="The resource booking form will be available here."
-            />
-          }
-        />
-        <Route
-          path="maintenance"
-          element={
-            <ComingSoon
-              title="Maintenance"
-              description="Maintenance request tracking and scheduling will be available here."
-            />
-          }
-        />
-        <Route
-          path="maintenance/new"
-          element={
-            <ComingSoon
-              title="Raise Maintenance Request"
-              description="The maintenance request form will be available here."
-            />
-          }
-        />
+        {/* ─── Member 3: Bookings & Maintenance ─── */}
+        <Route path="bookings" element={<BookingsPage />} />
+        <Route path="bookings/new" element={<BookingsPage />} />
+        <Route path="maintenance" element={<MaintenancePage />} />
+        <Route path="maintenance/new" element={<MaintenancePage />} />
 
         {/* ─── Member 4: Audit & Reports ─── */}
         <Route

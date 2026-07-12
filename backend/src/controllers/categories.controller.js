@@ -152,6 +152,19 @@ async function update(req, res) {
     });
 
     const cat = result.rows[0];
+    
+    // Count assets per category defensively
+    let assetCount = 0;
+    try {
+      const countResult = await db.query(
+        `SELECT COUNT(*)::int AS count FROM assets WHERE category_id = $1`,
+        [id]
+      );
+      assetCount = countResult.rows[0].count;
+    } catch {
+      // assets table doesn't exist yet
+    }
+
     res.json({
       success: true,
       data: {
@@ -159,7 +172,7 @@ async function update(req, res) {
         name: cat.name,
         description: cat.description,
         customFields: cat.custom_fields,
-        assetCount: 0,
+        assetCount,
         createdAt: cat.created_at,
         updatedAt: cat.updated_at,
       },

@@ -29,45 +29,108 @@ async function seed() {
   console.log('🌱 Seeding database...');
 
   try {
-    // ── 1. Admin Account ──────────────────────────────────
-    // This is the ONLY pre-created user. Everyone else signs
-    // up themselves and starts as an Employee.
-    const adminPassword = await bcrypt.hash('admin123', SALT_ROUNDS);
-    const adminResult = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, is_active)
-       VALUES ($1, $2, $3, 'admin', true)
-       ON CONFLICT (email) DO UPDATE
-         SET name = EXCLUDED.name,
-             password_hash = EXCLUDED.password_hash,
-             role = 'admin',
-             is_active = true
-       RETURNING id`,
-      ['Admin', 'admin@assetflow.com', adminPassword]
-    );
-    const adminId = adminResult.rows[0].id;
-    console.log('  ✅ Admin created: admin@assetflow.com / admin123');
-
-    // ── 2. Departments ────────────────────────────────────
-    // Department heads are NOT assigned here.
-    // Admin promotes an employee to Dept Head and then assigns
-    // them via the Org Setup page.
+    // ── 1. Departments ────────────────────────────────────
     const departments = [
       { name: 'IT',              desc: 'Information Technology & Infrastructure' },
       { name: 'Human Resources', desc: 'People Operations & Talent Management' },
       { name: 'Finance',         desc: 'Financial Planning & Accounting' },
       { name: 'Marketing',       desc: 'Brand Strategy & Digital Marketing' },
       { name: 'Operations',      desc: 'Business Operations & Logistics' },
+      { name: 'Engineering',     desc: 'Product Engineering & Development' },
     ];
 
+    const deptIds = {};
     for (const dept of departments) {
+      let existing = await db.query('SELECT id FROM departments WHERE name = $1', [dept.name]);
+      if (existing.rows.length > 0) {
+        deptIds[dept.name] = existing.rows[0].id;
+      } else {
+        const res = await db.query(
+          `INSERT INTO departments (name, description, is_active)
+           VALUES ($1, $2, true)
+           RETURNING id`,
+          [dept.name, dept.desc]
+        );
+        deptIds[dept.name] = res.rows[0].id;
+      }
+    }
+
+    // Update Engineering parent_department_id to IT
+    if (deptIds['Engineering'] && deptIds['IT']) {
       await db.query(
-        `INSERT INTO departments (name, description, is_active)
-         VALUES ($1, $2, true)
-         ON CONFLICT DO NOTHING`,
-        [dept.name, dept.desc]
+        'UPDATE departments SET parent_department_id = $1 WHERE id = $2',
+        [deptIds['IT'], deptIds['Engineering']]
       );
     }
-    console.log('  ✅ Departments seeded (no heads assigned — Admin decides)');
+    console.log('  ✅ Departments seeded');
+
+    // ── 2. Users (Default Credentials) ────────────────────
+    // Clean up test accounts from previous API test runs
+    await db.query("DELETE FROM users WHERE email LIKE 'testuser%' OR email = 'hacker@test.com'");
+
+    const usersToSeed = [
+      {
+        name: 'Admin',
+        email: 'admin@assetflow.com',
+        password: 'admin123',
+        role: 'admin',
+        deptName: 'IT'
+      },
+      {
+        name: 'Asset Manager',
+        email: 'manager@assetflow.com',
+        password: 'password123',
+        role: 'asset_manager',
+        deptName: 'Operations'
+      },
+      {
+        name: 'Department Head',
+        email: 'head@assetflow.com',
+        password: 'password123',
+        role: 'department_head',
+        deptName: 'Engineering'
+      },
+      {
+        name: 'Employee',
+        email: 'employee@assetflow.com',
+        password: 'password123',
+        role: 'employee',
+        deptName: 'Marketing'
+      }
+    ];
+
+    const userIds = {};
+    for (const u of usersToSeed) {
+      const hashedPassword = await bcrypt.hash(u.password, SALT_ROUNDS);
+      const deptId = deptIds[u.deptName] || null;
+
+      const res = await db.query(
+        `INSERT INTO users (name, email, password_hash, role, department_id, is_active)
+         VALUES ($1, $2, $3, $4, $5, true)
+         ON CONFLICT (email) DO UPDATE
+           SET name = EXCLUDED.name,
+               password_hash = EXCLUDED.password_hash,
+               role = EXCLUDED.role,
+               department_id = EXCLUDED.department_id,
+               is_active = true
+         RETURNING id`,
+        [u.name, u.email.toLowerCase().trim(), hashedPassword, u.role, deptId]
+      );
+      userIds[u.email] = res.rows[0].id;
+      console.log(`  ✅ User created/updated: ${u.email} / ${u.password} (Role: ${u.role})`);
+    }
+
+    // Assign department heads
+    if (deptIds['IT'] && userIds['admin@assetflow.com']) {
+      await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [userIds['admin@assetflow.com'], deptIds['IT']]);
+    }
+    if (deptIds['Operations'] && userIds['manager@assetflow.com']) {
+      await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [userIds['manager@assetflow.com'], deptIds['Operations']]);
+    }
+    if (deptIds['Engineering'] && userIds['head@assetflow.com']) {
+      await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [userIds['head@assetflow.com'], deptIds['Engineering']]);
+    }
+    console.log('  ✅ Department heads assigned');
 
     // ── 3. Asset Categories ───────────────────────────────
     const categories = [
@@ -116,20 +179,93 @@ async function seed() {
     ];
 
     for (const cat of categories) {
-      await db.query(
-        `INSERT INTO asset_categories (name, description, custom_fields)
-         VALUES ($1, $2, $3)
-         ON CONFLICT DO NOTHING`,
-        [cat.name, cat.desc, JSON.stringify(cat.fields)]
-      );
+      let existing = await db.query('SELECT id FROM asset_categories WHERE name = $1', [cat.name]);
+      if (existing.rows.length === 0) {
+        await db.query(
+          `INSERT INTO asset_categories (name, description, custom_fields)
+           VALUES ($1, $2, $3)`,
+          [cat.name, cat.desc, JSON.stringify(cat.fields)]
+        );
+      }
     }
     console.log('  ✅ Asset categories seeded');
 
+    // Fetch categories mapping to associate assets
+    const categoryResult = await db.query('SELECT id, name FROM asset_categories');
+    const catMap = {};
+    categoryResult.rows.forEach(r => { catMap[r.name] = r.id; });
+
+    // Seed sample assets
+    const assetsToSeed = [
+      {
+        tag: 'AST-ROOM-A',
+        name: 'Conference Room Alpha',
+        catName: 'Office Equipment',
+        deptName: 'Operations',
+        location: 'HQ Floor 3, Room 302',
+        isBookable: true,
+        status: 'Available'
+      },
+      {
+        tag: 'AST-VEH-01',
+        name: 'Tesla Model 3 (Company Car)',
+        catName: 'Vehicles',
+        deptName: 'IT',
+        location: 'Basement Parking Slot 14',
+        isBookable: true,
+        status: 'Available'
+      },
+      {
+        tag: 'AST-PROJ-05',
+        name: 'Epson 4K Laser Projector',
+        catName: 'Office Equipment',
+        deptName: 'Marketing',
+        location: 'Marketing Storage Box 4',
+        isBookable: true,
+        status: 'Available'
+      },
+      {
+        tag: 'AST-LAP-99',
+        name: 'MacBook Pro 16" (M3 Max)',
+        catName: 'Electronics',
+        deptName: 'Engineering',
+        location: 'Assigned to head',
+        isBookable: false,
+        status: 'Available'
+      },
+      {
+        tag: 'AST-PRN-01',
+        name: 'HP LaserJet Enterprise Printer',
+        catName: 'Office Equipment',
+        deptName: 'Finance',
+        location: 'Main Finance Office Hallway',
+        isBookable: false,
+        status: 'Available'
+      }
+    ];
+
+    for (const asset of assetsToSeed) {
+      const catId = catMap[asset.catName] || null;
+      const deptId = deptIds[asset.deptName] || null;
+      
+      // Check if tag already exists
+      const existingAsset = await db.query('SELECT id FROM assets WHERE asset_tag = $1', [asset.tag]);
+      if (existingAsset.rows.length === 0) {
+        await db.query(
+          `INSERT INTO assets (asset_tag, name, category_id, serial_number, acquisition_date, acquisition_cost, condition, location, status, is_bookable, department_id)
+           VALUES ($1, $2, $3, $4, CURRENT_DATE - INTERVAL '6 months', 1500.00, 'Good', $5, $6, $7, $8)`,
+          [asset.tag, asset.name, catId, 'SN-' + asset.tag, asset.location, asset.status, asset.isBookable, deptId]
+        );
+      }
+    }
+    console.log('  ✅ Sample assets seeded');
+
     // ── 4. Welcome Activity Log ───────────────────────────
+    const welcomeAdminId = userIds['admin@assetflow.com'] || null;
     await db.query(
       `INSERT INTO activity_logs (user_id, action, entity_type)
        VALUES ($1, $2, 'system')`,
-      [adminId, 'AssetFlow system initialized by Admin']
+      [welcomeAdminId, 'AssetFlow system initialized by Admin']
     );
     console.log('  ✅ Welcome activity log created');
 
