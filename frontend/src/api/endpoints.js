@@ -13,7 +13,8 @@
  * ============================================================
  */
 
-import client, { USE_MOCKS } from './client';
+import client, { USE_MOCKS, BACKEND_ORIGIN } from './client';
+export { USE_MOCKS, BACKEND_ORIGIN };
 import {
   mockUsers,
   mockEmployees,

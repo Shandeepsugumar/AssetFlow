@@ -42,11 +42,8 @@ const PORT = process.env.PORT || 5000;
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || origin.startsWith('http://localhost:')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Dynamically allow origins (localhost, Render, Vercel, custom domain) with credentials
+    callback(null, true);
   },
   credentials: true,
 }));

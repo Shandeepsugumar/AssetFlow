@@ -17,21 +17,20 @@
 
 import axios from 'axios';
 
-// Base URL — configurable via environment variable
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// Base URL — configurable via environment variable, defaults to deployed Render backend
+export const BACKEND_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'https://assetflow-fkyo.onrender.com/api').replace(/\/api\/?$/, '');
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://assetflow-fkyo.onrender.com/api';
 
 /**
  * Feature flag: set to true to use mock data instead of the real API.
- * Toggle via VITE_USE_MOCKS env var, defaults to true for development.
- * Set to 'false' in .env to hit the real backend:
- *   VITE_USE_MOCKS=false
+ * Toggle via VITE_USE_MOCKS env var. Defaults to false when hitting deployed backend.
  */
-export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false';
+export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 
 const client = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 30000,
 });
 
 // ── Request Interceptor: inject JWT token ───────────────────

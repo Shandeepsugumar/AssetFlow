@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { assetsApi, categoriesApi, departmentsApi } from '../../api/endpoints';
+import { assetsApi, categoriesApi, departmentsApi, BACKEND_ORIGIN } from '../../api/endpoints';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button, Table, Badge, Modal, Select, Input } from '../../components/ui';
@@ -8,7 +8,7 @@ import { Plus, Search, Eye, Pencil, Package, FileText, Image } from 'lucide-reac
 const STATUSES = ['Available', 'Allocated', 'Reserved', 'Under Maintenance', 'Lost', 'Retired', 'Disposed'];
 const CONDITIONS = ['Excellent', 'Good', 'Fair', 'Poor'];
 
-const BACKEND = 'http://localhost:5000';
+const BACKEND = BACKEND_ORIGIN;
 
 function statusVariant(status) {
   if (status === 'Available') return 'success';
