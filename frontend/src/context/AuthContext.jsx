@@ -3,6 +3,16 @@ import { authApi } from '../api/endpoints';
 
 const AuthContext = createContext(null);
 
+const normalizeUser = (user) => {
+  if (!user) return null;
+  return {
+    ...user,
+    role: user.role
+      ? user.role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      : user.role
+  };
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -20,7 +30,7 @@ export function AuthProvider({ children }) {
         setToken(storedToken);
         const result = await authApi.getMe();
         if (result.success && result.data?.user) {
-          setUser(result.data.user);
+          setUser(normalizeUser(result.data.user));
         } else {
           localStorage.removeItem('assetflow_token');
           setToken(null);
@@ -40,7 +50,7 @@ export function AuthProvider({ children }) {
     if (result.success && result.data) {
       localStorage.setItem('assetflow_token', result.data.token);
       setToken(result.data.token);
-      setUser(result.data.user);
+      setUser(normalizeUser(result.data.user));
     }
     return result;
   }, []);
@@ -50,7 +60,7 @@ export function AuthProvider({ children }) {
     if (result.success && result.data) {
       localStorage.setItem('assetflow_token', result.data.token);
       setToken(result.data.token);
-      setUser(result.data.user);
+      setUser(normalizeUser(result.data.user));
     }
     return result;
   }, []);

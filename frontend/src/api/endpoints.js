@@ -230,7 +230,8 @@ export const departmentsApi = {
       const updated = _mockDepts.find((d) => d.id === id);
       return { success: true, data: updated, error: null };
     }
-    const res = await client.put(`/departments/${id}/deactivate`);
+    // PATCH — matches backend route
+    const res = await client.patch(`/departments/${id}/deactivate`);
     return res.data;
   },
 };
@@ -330,7 +331,21 @@ export const employeesApi = {
       const updated = _mockEmps.find((e) => e.id === id);
       return { success: true, data: updated, error: null };
     }
-    const res = await client.put(`/employees/${id}/role`, { role });
+    // PATCH — only endpoint in the system that changes a user's role
+    const res = await client.patch(`/employees/${id}/role`, { role });
+    return res.data;
+  },
+
+  async deactivate(id) {
+    if (USE_MOCKS) {
+      await delay(400);
+      _mockEmps = _mockEmps.map((e) =>
+        e.id === id ? { ...e, status: e.status === 'Active' ? 'Inactive' : 'Active' } : e
+      );
+      const updated = _mockEmps.find((e) => e.id === id);
+      return { success: true, data: updated, error: null };
+    }
+    const res = await client.patch(`/employees/${id}/deactivate`);
     return res.data;
   },
 };
