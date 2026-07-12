@@ -35,14 +35,21 @@ Server runs at **http://localhost:5000/api**
 
 ---
 
-## Default Login Credentials
+## Default Login Credentials & Role Workflow
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** | admin@assetflow.com | admin123 |
-| Asset Manager | manager@assetflow.com | password123 |
-| Department Head | head@assetflow.com | password123 |
-| Employee | employee@assetflow.com | password123 |
+> [!IMPORTANT]
+> By design, **only the Admin account** is pre-seeded into the database by `npm run db:seed`. All other roles are managed dynamically through the Admin Dashboard.
+
+| Role | Email | Password | Notes |
+|------|-------|----------|-------|
+| **Admin** | `admin@assetflow.com` | `admin123` | Only pre-created account. Has full access to promote users and manage org setup. |
+
+### How Roles Are Assigned (`Role Workflow`)
+1. **Self-Registration (Employee):** New users (Teammates, Asset Managers, Department Heads, and Employees) register themselves on the frontend via the `/signup` page. All newly registered accounts are assigned the **Employee** (`employee`) role by default.
+2. **Role Promotion (Admin):** The Admin logs into the dashboard (`http://localhost:5173/login`) and navigates to **Org Setup → Employee Directory**.
+3. **Assigning Roles:** From the Employee Directory tab, the Admin clicks **Change Role** next to any registered employee to promote them to either:
+   - **Asset Manager** (`asset_manager`)
+   - **Department Head** (`department_head`)
 
 ---
 
