@@ -202,6 +202,16 @@ export default function EmployeeDirectoryTab() {
         data={employees}
         loading={loading}
         emptyMessage="No employees found matching your filters"
+        pagination={
+          paginationInfo.total > 0
+            ? {
+                page: paginationInfo.page || 1,
+                pageSize: paginationInfo.limit || 10,
+                total: paginationInfo.total || 0,
+                onPageChange: (newPage) => setPage(newPage),
+              }
+            : null
+        }
       />
 
       {/* Role Promotion Modal */}
