@@ -351,26 +351,123 @@ export const employeesApi = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// ASSETS API (FALLBACK)
+// ASSETS API
 // ─────────────────────────────────────────────────────────────
 export const assetsApi = {
   async getAll(params = {}) {
     if (USE_MOCKS) {
       await delay(300);
-      let list = [
-        { id: 'ast-001', assetTag: 'AST-ROOM-A', name: 'Conference Room Alpha', categoryName: 'Office Equipment', status: 'Available', isBookable: true, location: 'HQ Floor 3' },
-        { id: 'ast-002', assetTag: 'AST-VEH-01', name: 'Tesla Model 3 (Company Car)', categoryName: 'Vehicles', status: 'Available', isBookable: true, location: 'Basement Parking Slot 14' },
-        { id: 'ast-003', assetTag: 'AST-PROJ-05', name: 'Epson 4K Laser Projector', categoryName: 'Office Equipment', status: 'Available', isBookable: true, location: 'Marketing Box 4' }
-      ];
-      if (params.is_bookable !== undefined) {
-        list = list.filter(a => a.isBookable === (params.is_bookable === 'true'));
-      }
-      return { success: true, data: list, error: null };
+      return { success: true, data: [], error: null };
     }
     const res = await client.get('/assets', { params });
     return res.data;
-  }
+  },
+
+  async getById(id) {
+    if (USE_MOCKS) {
+      await delay(300);
+      return { success: false, data: null, error: 'Not in mock mode' };
+    }
+    const res = await client.get(`/assets/${id}`);
+    return res.data;
+  },
+
+  async create(formData) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id: `ast-${Date.now()}`, ...formData }, error: null };
+    }
+    const res = await client.post('/assets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  async update(id, formData) {
+    if (USE_MOCKS) {
+      await delay(400);
+      return { success: true, data: { id }, error: null };
+    }
+    const res = await client.put(`/assets/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  async getHistory(id) {
+    if (USE_MOCKS) {
+      await delay(300);
+      return { success: true, data: { allocations: [], maintenance: [] }, error: null };
+    }
+    const res = await client.get(`/assets/${id}/history`);
+    return res.data;
+  },
 };
+
+// ─────────────────────────────────────────────────────────────
+// ALLOCATIONS API
+// ─────────────────────────────────────────────────────────────
+export const allocationsApi = {
+  async getAll(params = {}) {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: [], error: null }; }
+    const res = await client.get('/allocations', { params });
+    return res.data;
+  },
+
+  async getOverdue() {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: [], error: null }; }
+    const res = await client.get('/allocations/overdue');
+    return res.data;
+  },
+
+  async allocate(data) {
+    if (USE_MOCKS) {
+      await delay(500);
+      return { success: true, data: { id: `al-${Date.now()}`, ...data, status: 'Active' }, error: null };
+    }
+    const res = await client.post('/allocations', data);
+    return res.data;
+  },
+
+  async returnAsset(id, notes) {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: { id, status: 'Returned' }, error: null }; }
+    const res = await client.post(`/allocations/${id}/return`, { notes });
+    return res.data;
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+// TRANSFERS API
+// ─────────────────────────────────────────────────────────────
+export const transfersApi = {
+  async getAll(params = {}) {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: [], error: null }; }
+    const res = await client.get('/transfers', { params });
+    return res.data;
+  },
+
+  async create(data) {
+    if (USE_MOCKS) {
+      await delay(500);
+      return { success: true, data: { id: `tr-${Date.now()}`, ...data, status: 'Requested' }, error: null };
+    }
+    const res = await client.post('/transfers', data);
+    return res.data;
+  },
+
+  async approve(id) {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: { id, status: 'Approved' }, error: null }; }
+    const res = await client.patch(`/transfers/${id}/approve`);
+    return res.data;
+  },
+
+  async reject(id, notes) {
+    if (USE_MOCKS) { await delay(400); return { success: true, data: { id, status: 'Rejected' }, error: null }; }
+    const res = await client.patch(`/transfers/${id}/reject`, { notes });
+    return res.data;
+  },
+};
+
 
 // ─────────────────────────────────────────────────────────────
 // BOOKINGS API

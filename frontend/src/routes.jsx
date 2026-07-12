@@ -21,6 +21,10 @@ import ResetPassword from './pages/auth/ResetPassword';
 import Dashboard from './pages/dashboard/Dashboard';
 import OrgSetup from './pages/org-setup/OrgSetup';
 
+// Member 2 pages (Assets & Allocation)
+import AssetDirectoryPage from './pages/assets/AssetDirectoryPage';
+import AssetAllocationPage from './pages/assets/AssetAllocationPage';
+
 // Member 3 pages (Bookings & Maintenance)
 import BookingsPage from './pages/bookings/BookingsPage';
 import MaintenancePage from './pages/maintenance/MaintenancePage';
@@ -64,34 +68,9 @@ export default function AppRoutes() {
           }
         />
 
-        {/* ─── Member 2: Assets & Allocation (stub routes) ─── */}
-        <Route
-          path="assets"
-          element={
-            <ComingSoon
-              title="Assets"
-              description="Asset registration, lifecycle tracking, and inventory management will be available here."
-            />
-          }
-        />
-        <Route
-          path="assets/new"
-          element={
-            <ComingSoon
-              title="Register Asset"
-              description="The asset registration form will be available here."
-            />
-          }
-        />
-        <Route
-          path="allocation"
-          element={
-            <ComingSoon
-              title="Allocation & Transfer"
-              description="Asset allocation, transfer requests, and return tracking will be available here."
-            />
-          }
-        />
+        {/* ─── Member 2: Assets & Allocation ─── */}
+        <Route path="assets" element={<AssetDirectoryPage />} />
+        <Route path="allocation" element={<AssetAllocationPage />} />
 
         {/* ─── Member 3: Bookings & Maintenance ─── */}
         <Route path="bookings" element={<BookingsPage />} />

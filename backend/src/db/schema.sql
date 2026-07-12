@@ -201,7 +201,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for the new tables
 CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category_id);
 CREATE INDEX IF NOT EXISTS idx_assets_department ON assets(department_id);
 CREATE INDEX IF NOT EXISTS idx_assets_holder ON assets(current_holder_id);
@@ -212,3 +211,60 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_asset ON maintenance_requests(asset_i
 CREATE INDEX IF NOT EXISTS idx_maintenance_user ON maintenance_requests(raised_by);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE is_read = false;
+
+-- ────────────────────────────────────────────────────────────
+-- ALLOCATIONS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS allocations (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id              UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  allocated_to_user     UUID REFERENCES users(id) ON DELETE SET NULL,
+  allocated_to_dept     UUID REFERENCES departments(id) ON DELETE SET NULL,
+  allocated_by          UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  allocation_date       DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_return_date  DATE,
+  actual_return_date    DATE,
+  purpose               TEXT,
+  notes                 TEXT,
+  status                VARCHAR(50) NOT NULL DEFAULT 'Active', -- Active, Returned
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS set_allocations_updated_at ON allocations;
+CREATE TRIGGER set_allocations_updated_at
+  BEFORE UPDATE ON allocations
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ────────────────────────────────────────────────────────────
+-- TRANSFER REQUESTS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS transfer_requests (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id          UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  from_employee_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+  to_employee_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+  to_department_id  UUID REFERENCES departments(id) ON DELETE SET NULL,
+  requested_by      UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  approved_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+  status            VARCHAR(50) NOT NULL DEFAULT 'Requested', -- Requested, Approved, Rejected
+  notes             TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS set_transfer_requests_updated_at ON transfer_requests;
+CREATE TRIGGER set_transfer_requests_updated_at
+  BEFORE UPDATE ON transfer_requests
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_allocations_asset ON allocations(asset_id);
+CREATE INDEX IF NOT EXISTS idx_allocations_user ON allocations(allocated_to_user);
+CREATE INDEX IF NOT EXISTS idx_allocations_status ON allocations(status);
+CREATE INDEX IF NOT EXISTS idx_transfers_asset ON transfer_requests(asset_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_status ON transfer_requests(status);
+
+-- Add document_url to assets if not present
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS document_url TEXT;
+
