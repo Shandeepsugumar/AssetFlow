@@ -27,6 +27,9 @@ const categoryRoutes = require('./src/routes/categories.routes');
 const employeeRoutes = require('./src/routes/employees.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
 const activityLogRoutes = require('./src/routes/activityLogs.routes');
+const bookingRoutes = require('./src/routes/bookings.routes');
+const maintenanceRoutes = require('./src/routes/maintenance.routes');
+const assetRoutes = require('./src/routes/assets.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -65,6 +68,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/assets', assetRoutes);
 
 // ── 404 Handler ─────────────────────────────────────────────
 app.use((_req, res) => {

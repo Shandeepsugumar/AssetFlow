@@ -38,67 +38,85 @@ async function getStats(req, res) {
     };
 
     // ── Assets Available ────────────────────────────────
-    // Counts assets with status = 'available' (assets table owned by Member 2)
+    // Counts assets with status = 'Available'
     try {
-      let q = `SELECT COUNT(*)::int AS count FROM assets WHERE status = 'available'`;
+      let q = `SELECT COUNT(*)::int AS count FROM assets WHERE status ILIKE 'Available'`;
       const params = [];
       if (isDeptHead && department_id) {
         q += ` AND department_id = $1`;
         params.push(department_id);
       } else if (!isOrgWide) {
-        q += ` AND assigned_to = $1`;
+        q += ` AND current_holder_id = $1`;
         params.push(userId);
       }
       const r = await db.query(q, params);
       stats.assetsAvailable = r.rows[0].count;
-    } catch { /* table doesn't exist yet */ }
+    } catch (err) {
+      console.error('[Dashboard Stats] Available error:', err.message);
+    }
 
     // ── Assets Allocated ────────────────────────────────
     try {
-      let q = `SELECT COUNT(*)::int AS count FROM assets WHERE status = 'allocated'`;
+      let q = `SELECT COUNT(*)::int AS count FROM assets WHERE status ILIKE 'Allocated'`;
       const params = [];
       if (isDeptHead && department_id) {
         q += ` AND department_id = $1`;
         params.push(department_id);
       } else if (!isOrgWide) {
-        q += ` AND assigned_to = $1`;
+        q += ` AND current_holder_id = $1`;
         params.push(userId);
       }
       const r = await db.query(q, params);
       stats.assetsAllocated = r.rows[0].count;
-    } catch { /* table doesn't exist yet */ }
+    } catch (err) {
+      console.error('[Dashboard Stats] Allocated error:', err.message);
+    }
 
     // ── Maintenance Today ───────────────────────────────
     try {
-      let q = `SELECT COUNT(*)::int AS count FROM maintenance_requests
-               WHERE DATE(scheduled_date) = CURRENT_DATE`;
+      let q = `SELECT COUNT(*)::int AS count FROM maintenance_requests m
+               JOIN assets a ON m.asset_id = a.id
+               JOIN users u ON m.raised_by = u.id
+               WHERE DATE(m.created_at) = CURRENT_DATE`;
       const params = [];
+      let paramIdx = 1;
       if (isDeptHead && department_id) {
-        q += ` AND department_id = $1`;
+        q += ` AND (a.department_id = $${paramIdx} OR u.department_id = $${paramIdx})`;
         params.push(department_id);
+        paramIdx++;
       } else if (!isOrgWide) {
-        q += ` AND requested_by = $1`;
+        q += ` AND m.raised_by = $${paramIdx}`;
         params.push(userId);
+        paramIdx++;
       }
       const r = await db.query(q, params);
       stats.maintenanceToday = r.rows[0].count;
-    } catch { /* table doesn't exist yet */ }
+    } catch (err) {
+      console.error('[Dashboard Stats] Maintenance error:', err.message);
+    }
 
     // ── Active Bookings ─────────────────────────────────
     try {
-      let q = `SELECT COUNT(*)::int AS count FROM bookings
-               WHERE status = 'active' AND end_time > NOW()`;
+      let q = `SELECT COUNT(*)::int AS count FROM bookings b
+               JOIN assets a ON b.asset_id = a.id
+               JOIN users u ON b.booked_by = u.id
+               WHERE b.status != 'Cancelled' AND b.start_time <= NOW() AND b.end_time >= NOW()`;
       const params = [];
+      let paramIdx = 1;
       if (isDeptHead && department_id) {
-        q += ` AND department_id = $1`;
+        q += ` AND (a.department_id = $${paramIdx} OR u.department_id = $${paramIdx})`;
         params.push(department_id);
+        paramIdx++;
       } else if (!isOrgWide) {
-        q += ` AND booked_by = $1`;
+        q += ` AND b.booked_by = $${paramIdx}`;
         params.push(userId);
+        paramIdx++;
       }
       const r = await db.query(q, params);
       stats.activeBookings = r.rows[0].count;
-    } catch { /* table doesn't exist yet */ }
+    } catch (err) {
+      console.error('[Dashboard Stats] Bookings error:', err.message);
+    }
 
     // ── Pending Transfers ───────────────────────────────
     try {

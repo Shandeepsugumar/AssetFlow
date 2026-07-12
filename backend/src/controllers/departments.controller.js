@@ -61,6 +61,44 @@ async function getAll(req, res) {
 }
 
 /**
+ * Helper to fetch department details (parentName, headName, employeeCount, camelCase keys)
+ */
+async function getDepartmentWithDetails(id) {
+  const result = await db.query(
+    `SELECT d.*,
+            pd.name AS parent_name,
+            u.name AS head_name
+     FROM departments d
+     LEFT JOIN departments pd ON d.parent_department_id = pd.id
+     LEFT JOIN users u ON d.department_head_id = u.id
+     WHERE d.id = $1`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+  const d = result.rows[0];
+
+  // Count employees in this department
+  const countRes = await db.query(
+    `SELECT COUNT(*)::int AS count FROM users WHERE department_id = $1`,
+    [id]
+  );
+
+  return {
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    headId: d.department_head_id,
+    headName: d.head_name,
+    parentId: d.parent_department_id,
+    parentName: d.parent_name,
+    status: d.is_active ? 'Active' : 'Inactive',
+    employeeCount: countRes.rows[0].count,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  };
+}
+
+/**
  * POST /api/departments
  * Admin only. Creates a new department.
  */
@@ -104,7 +142,8 @@ async function create(req, res) {
       entityId: dept.id,
     });
 
-    res.status(201).json({ success: true, data: dept, error: null });
+    const formattedDept = await getDepartmentWithDetails(dept.id);
+    res.status(201).json({ success: true, data: formattedDept, error: null });
   } catch (err) {
     console.error('[Departments] Create error:', err.message);
     res.status(500).json({ success: false, data: null, error: 'Internal server error' });
@@ -135,11 +174,10 @@ async function update(req, res) {
       return res.status(400).json({ success: false, data: null, error: 'A department cannot be its own parent' });
     }
 
-    const result = await db.query(
+    await db.query(
       `UPDATE departments
        SET name = $1, description = $2, department_head_id = $3, parent_department_id = $4
-       WHERE id = $5
-       RETURNING *`,
+       WHERE id = $5`,
       [name.trim(), description || '', headId || null, parentId || null, id]
     );
 
@@ -150,7 +188,8 @@ async function update(req, res) {
       entityId: id,
     });
 
-    res.json({ success: true, data: result.rows[0], error: null });
+    const formattedDept = await getDepartmentWithDetails(id);
+    res.json({ success: true, data: formattedDept, error: null });
   } catch (err) {
     console.error('[Departments] Update error:', err.message);
     res.status(500).json({ success: false, data: null, error: 'Internal server error' });
@@ -184,7 +223,8 @@ async function deactivate(req, res) {
       entityId: id,
     });
 
-    res.json({ success: true, data: result.rows[0], error: null });
+    const formattedDept = await getDepartmentWithDetails(id);
+    res.json({ success: true, data: formattedDept, error: null });
   } catch (err) {
     console.error('[Departments] Deactivate error:', err.message);
     res.status(500).json({ success: false, data: null, error: 'Internal server error' });

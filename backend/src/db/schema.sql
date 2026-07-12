@@ -127,3 +127,88 @@ DROP TRIGGER IF EXISTS set_asset_categories_updated_at ON asset_categories;
 CREATE TRIGGER set_asset_categories_updated_at
   BEFORE UPDATE ON asset_categories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ────────────────────────────────────────────────────────────
+-- ASSETS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS assets (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_tag           VARCHAR(100) NOT NULL UNIQUE,
+  name                VARCHAR(255) NOT NULL,
+  category_id         UUID REFERENCES asset_categories(id) ON DELETE SET NULL,
+  serial_number       VARCHAR(100),
+  acquisition_date    DATE,
+  acquisition_cost    DECIMAL(12, 2),
+  condition           VARCHAR(50) DEFAULT 'Good',
+  location            VARCHAR(255),
+  status              VARCHAR(50) DEFAULT 'Available', -- Available, Allocated, Reserved, Under Maintenance, Lost, Retired, Disposed
+  is_bookable         BOOLEAN NOT NULL DEFAULT false,
+  department_id       UUID REFERENCES departments(id) ON DELETE SET NULL,
+  current_holder_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+  photo_url           TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Trigger for assets updated_at
+DROP TRIGGER IF EXISTS set_assets_updated_at ON assets;
+CREATE TRIGGER set_assets_updated_at
+  BEFORE UPDATE ON assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ────────────────────────────────────────────────────────────
+-- BOOKINGS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bookings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id    UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  booked_by   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  start_time  TIMESTAMPTZ NOT NULL,
+  end_time    TIMESTAMPTZ NOT NULL,
+  status      VARCHAR(50) NOT NULL DEFAULT 'Upcoming', -- Upcoming, Ongoing, Completed, Cancelled
+  purpose     TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- MAINTENANCE REQUESTS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS maintenance_requests (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id              UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  raised_by             UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  issue_description     TEXT NOT NULL,
+  priority              VARCHAR(50) NOT NULL DEFAULT 'Medium', -- Low, Medium, High
+  photo_url             TEXT,
+  status                VARCHAR(50) NOT NULL DEFAULT 'Pending', -- Pending, Approved, Rejected, In Progress, Resolved
+  approved_by           UUID REFERENCES users(id) ON DELETE SET NULL,
+  technician_assigned   VARCHAR(255),
+  resolved_at           TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- NOTIFICATIONS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type                  VARCHAR(50) NOT NULL,
+  message               TEXT NOT NULL,
+  is_read               BOOLEAN NOT NULL DEFAULT false,
+  related_entity_type   VARCHAR(100),
+  related_entity_id     UUID,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for the new tables
+CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category_id);
+CREATE INDEX IF NOT EXISTS idx_assets_department ON assets(department_id);
+CREATE INDEX IF NOT EXISTS idx_assets_holder ON assets(current_holder_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_asset ON bookings(asset_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(booked_by);
+CREATE INDEX IF NOT EXISTS idx_bookings_time ON bookings(start_time, end_time);
+CREATE INDEX IF NOT EXISTS idx_maintenance_asset ON maintenance_requests(asset_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_user ON maintenance_requests(raised_by);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE is_read = false;

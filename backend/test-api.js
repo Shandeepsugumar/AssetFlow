@@ -196,6 +196,92 @@ async function run() {
     check('Employee dashboard succeeds', empDash.success, JSON.stringify(empDash.error));
   }
 
+  // ── BOOKINGS & MAINTENANCE ───────────────────────
+  console.log('\n▸ Resource Bookings & Maintenance');
+  // Get bookable assets
+  const assetsRes = await req('GET', '/assets?is_bookable=true', null, adminToken);
+  check('GET /assets?is_bookable=true returns list', assetsRes.success && assetsRes.data?.length > 0);
+  const bookableAsset = assetsRes.data?.[0];
+
+  let bookingId = '';
+  if (bookableAsset) {
+    // 1. Create a booking
+    const startStr = new Date(Date.now() + 1000 * 60 * 60).toISOString(); // +1 hour
+    const endStr = new Date(Date.now() + 1000 * 60 * 120).toISOString(); // +2 hours
+    const bookingRes = await req('POST', '/bookings', {
+      assetId: bookableAsset.id,
+      startTime: startStr,
+      endTime: endStr,
+      purpose: 'API Test Booking'
+    }, adminToken);
+    check('POST /bookings creates upcoming booking', bookingRes.success && bookingRes.data?.status === 'Upcoming');
+    bookingId = bookingRes.data?.id;
+
+    // 2. Test overlap validation - overlaps existing
+    const overlapStrStart = new Date(Date.now() + 1000 * 60 * 90).toISOString(); // +1.5 hour (overlaps!)
+    const overlapStrEnd = new Date(Date.now() + 1000 * 60 * 150).toISOString(); // +2.5 hours
+    const overlapRes = await req('POST', '/bookings', {
+      assetId: bookableAsset.id,
+      startTime: overlapStrStart,
+      endTime: overlapStrEnd,
+      purpose: 'Should Fail Overlap'
+    }, adminToken);
+    check('POST /bookings rejects overlapping booking slot', !overlapRes.success && overlapRes.status === 400);
+
+    // 3. Test overlap validation - back-to-back should pass
+    const backToBackStrStart = endStr; // starts exactly when prior ends
+    const backToBackStrEnd = new Date(Date.now() + 1000 * 60 * 180).toISOString(); // +3 hours
+    const backToBackRes = await req('POST', '/bookings', {
+      assetId: bookableAsset.id,
+      startTime: backToBackStrStart,
+      endTime: backToBackStrEnd,
+      purpose: 'Back-to-back booking'
+    }, adminToken);
+    check('POST /bookings accepts back-to-back booking slot', backToBackRes.success);
+  }
+
+  // Get all assets
+  const allAssetsRes = await req('GET', '/assets', null, adminToken);
+  const maintAsset = allAssetsRes.data?.[0];
+  if (maintAsset) {
+    // 1. Raise maintenance request
+    const maintRes = await req('POST', '/maintenance', {
+      assetId: maintAsset.id,
+      issueDescription: 'Broken monitor screen',
+      priority: 'High'
+    }, adminToken);
+    check('POST /maintenance creates request in Pending state', maintRes.success && maintRes.data?.status === 'Pending');
+    const maintId = maintRes.data?.id;
+
+    if (maintId) {
+      // 2. Approve request
+      const approveRes = await req('PATCH', `/maintenance/${maintId}/approve`, null, adminToken);
+      check('PATCH /maintenance/:id/approve moves status to Approved', approveRes.success && approveRes.data?.status === 'Approved');
+
+      // Verify asset status transitioned to Under Maintenance
+      const assetVerify1 = await req('GET', `/assets/${maintAsset.id}`, null, adminToken);
+      check('Asset status updated to Under Maintenance', assetVerify1.data?.status === 'Under Maintenance');
+
+      // 3. Assign technician
+      const assignRes = await req('PATCH', `/maintenance/${maintId}/assign`, { technicianName: 'Bob the Builder' }, adminToken);
+      check('PATCH /maintenance/:id/assign moves status to In Progress', assignRes.success && assignRes.data?.status === 'In Progress');
+
+      // 4. Resolve request
+      const resolveRes = await req('PATCH', `/maintenance/${maintId}/resolve`, null, adminToken);
+      check('PATCH /maintenance/:id/resolve moves status to Resolved', resolveRes.success && resolveRes.data?.status === 'Resolved');
+
+      // Verify asset status reverted back to Available
+      const assetVerify2 = await req('GET', `/assets/${maintAsset.id}`, null, adminToken);
+      check('Asset status reverted back to Available', assetVerify2.data?.status === 'Available');
+    }
+  }
+
+  // Cancel the booking to clean up
+  if (bookingId) {
+    const cancelRes = await req('PATCH', `/bookings/${bookingId}/cancel`, null, adminToken);
+    check('PATCH /bookings/:id/cancel cancels booking', cancelRes.success && cancelRes.data?.status === 'Cancelled');
+  }
+
   // ── ACTIVITY LOGS ─────────────────────────────────
   console.log('\n▸ Activity Logs');
   const logs = await req('GET', '/activity-logs/recent', null, adminToken);

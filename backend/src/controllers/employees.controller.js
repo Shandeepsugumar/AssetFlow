@@ -48,7 +48,7 @@ async function getAll(req, res) {
 
     if (role) {
       query += ` AND u.role = $${paramIdx}`;
-      params.push(role.toLowerCase());
+      params.push(role.toLowerCase().replace(/ /g, '_'));
       paramIdx++;
     }
 
@@ -100,6 +100,34 @@ async function getAll(req, res) {
 }
 
 /**
+ * Helper to fetch employee details with department names
+ */
+async function getEmployeeWithDetails(id) {
+  const result = await db.query(
+    `SELECT u.id, u.name, u.email, u.role, u.is_active,
+            u.department_id, d.name AS department,
+            u.created_at, u.updated_at
+     FROM users u
+     LEFT JOIN departments d ON u.department_id = d.id
+     WHERE u.id = $1`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+  const u = result.rows[0];
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: formatRole(u.role),
+    department: u.department,
+    departmentId: u.department_id,
+    status: u.is_active ? 'Active' : 'Inactive',
+    createdAt: u.created_at,
+    updatedAt: u.updated_at,
+  };
+}
+
+/**
  * PATCH /api/employees/:id/role
  * ⚠️  ADMIN ONLY — This is the ONLY place in the entire system
  *     where a user's role can be changed.
@@ -135,9 +163,8 @@ async function updateRole(req, res) {
       return res.status(400).json({ success: false, data: null, error: 'You cannot change your own role' });
     }
 
-    const result = await db.query(
-      `UPDATE users SET role = $1 WHERE id = $2
-       RETURNING id, name, email, role, department_id, is_active, created_at, updated_at`,
+    await db.query(
+      `UPDATE users SET role = $1 WHERE id = $2`,
       [normalizedRole, id]
     );
 
@@ -148,17 +175,10 @@ async function updateRole(req, res) {
       entityId: id,
     });
 
-    const updated = result.rows[0];
+    const updated = await getEmployeeWithDetails(id);
     res.json({
       success: true,
-      data: {
-        id: updated.id,
-        name: updated.name,
-        email: updated.email,
-        role: formatRole(updated.role),
-        departmentId: updated.department_id,
-        status: updated.is_active ? 'Active' : 'Inactive',
-      },
+      data: updated,
       error: null,
     });
   } catch (err) {
@@ -186,8 +206,8 @@ async function deactivate(req, res) {
     }
 
     const newStatus = !existing.rows[0].is_active;
-    const result = await db.query(
-      'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, name, email, role, is_active',
+    await db.query(
+      'UPDATE users SET is_active = $1 WHERE id = $2',
       [newStatus, id]
     );
 
@@ -199,7 +219,8 @@ async function deactivate(req, res) {
       entityId: id,
     });
 
-    res.json({ success: true, data: result.rows[0], error: null });
+    const updated = await getEmployeeWithDetails(id);
+    res.json({ success: true, data: updated, error: null });
   } catch (err) {
     console.error('[Employees] Deactivate error:', err.message);
     res.status(500).json({ success: false, data: null, error: 'Internal server error' });
