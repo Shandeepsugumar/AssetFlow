@@ -3,7 +3,7 @@ import { employeesApi, departmentsApi } from '../../api/endpoints';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button, Table, Badge, Modal, Select, Input } from '../../components/ui';
-import { Search, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Search, ShieldCheck, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const ROLES = ['Employee', 'Department Head', 'Asset Manager'];
 const PROMOTABLE_ROLES = ['Department Head', 'Asset Manager'];
@@ -18,11 +18,14 @@ export default function EmployeeDirectoryTab() {
   const [filterDept, setFilterDept] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [paginationInfo, setPaginationInfo] = useState({ page: 1, limit: 10, total: 0 });
 
   // Role promotion modal
   const [promoModal, setPromoModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [newRole, setNewRole] = useState('');
+  const [newDeptId, setNewDeptId] = useState('');
   const [promoting, setPromoting] = useState(false);
 
   const fetchData = async () => {
@@ -34,10 +37,15 @@ export default function EmployeeDirectoryTab() {
           department: filterDept,
           role: filterRole,
           status: filterStatus,
+          page,
+          limit: 10,
         }),
         departmentsApi.getAll(),
       ]);
-      if (empRes.success) setEmployees(empRes.data);
+      if (empRes.success) {
+        setEmployees(empRes.data);
+        if (empRes.pagination) setPaginationInfo(empRes.pagination);
+      }
       if (deptRes.success) setDepartments(deptRes.data);
     } catch {
       toast.error('Failed to load employees');
@@ -48,31 +56,57 @@ export default function EmployeeDirectoryTab() {
 
   useEffect(() => {
     fetchData();
+  }, [search, filterDept, filterRole, filterStatus, page]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
   }, [search, filterDept, filterRole, filterStatus]);
 
   const openPromotion = (emp) => {
     setSelectedEmployee(emp);
     setNewRole(emp.role);
+    setNewDeptId(emp.departmentId || '');
     setPromoModal(true);
   };
 
   const handlePromotion = async () => {
-    if (!newRole || newRole === selectedEmployee.role) {
-      toast.warning('Please select a different role');
+    if ((!newRole || newRole === selectedEmployee.role) && (newDeptId === (selectedEmployee.departmentId || ''))) {
+      toast.warning('No changes made');
       return;
     }
     setPromoting(true);
     try {
-      const res = await employeesApi.updateRole(selectedEmployee.id, newRole);
+      const res = await employeesApi.updateRole(selectedEmployee.id, newRole, newDeptId);
       if (res.success) {
-        toast.success(`${selectedEmployee.name} is now a ${newRole}`);
+        toast.success(`Updated role and department for ${selectedEmployee.name}`);
         fetchData();
         setPromoModal(false);
+      } else {
+        toast.error(res.error || 'Failed to update employee details');
       }
-    } catch {
-      toast.error('Failed to update role');
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Failed to update employee details';
+      toast.error(msg);
     } finally {
       setPromoting(false);
+    }
+  };
+
+  const handleToggleStatus = async (emp) => {
+    try {
+      const res = await employeesApi.deactivate(emp.id);
+      if (res.success) {
+        toast.success(
+          `Employee ${res.data.status === 'Active' ? 'activated' : 'deactivated'}`
+        );
+        fetchData();
+      } else {
+        toast.error(res.error || 'Failed to update status');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Failed to update status';
+      toast.error(msg);
     }
   };
 
@@ -124,18 +158,35 @@ export default function EmployeeDirectoryTab() {
     },
     {
       key: 'actions',
-      label: 'Assign Role',
+      label: 'Actions',
       render: (_, row) =>
         user?.role === 'Admin' ? (
           row.role !== 'Admin' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openPromotion(row)}
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Change Role
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openPromotion(row)}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Manage Role & Dept
+              </Button>
+              <button
+                onClick={() => handleToggleStatus(row)}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  row.status === 'Active'
+                    ? 'text-text-secondary hover:bg-warning-50 hover:text-warning-600'
+                    : 'text-warning-600 bg-warning-50 hover:bg-warning-100'
+                }`}
+                title={row.status === 'Active' ? 'Deactivate Employee' : 'Activate Employee'}
+              >
+                {row.status === 'Active' ? (
+                  <ToggleRight className="h-5 w-5 text-success-600" />
+                ) : (
+                  <ToggleLeft className="h-5 w-5 text-text-tertiary" />
+                )}
+              </button>
+            </div>
           ) : (
             <span className="text-xs text-text-tertiary">Admin</span>
           )
@@ -147,17 +198,17 @@ export default function EmployeeDirectoryTab() {
 
   return (
     <div className="space-y-4">
-      {/* Role assignment notice */}
+      {/* Role & Dept assignment notice */}
       <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium text-blue-800">
-            Role Assignment Center
+            Role & Department Assignment Center
           </p>
           <p className="text-xs text-blue-700 mt-0.5">
             This is the <strong>only place</strong> in the application where
-            roles are assigned. Use the "Change Role" button to promote an
-            Employee to Department Head or Asset Manager.
+            roles and departments are assigned to employees. Use the "Manage Role & Dept" button to promote an
+            Employee or assign them to a Department from the database.
           </p>
         </div>
       </div>
@@ -214,11 +265,11 @@ export default function EmployeeDirectoryTab() {
         }
       />
 
-      {/* Role Promotion Modal */}
+      {/* Role & Department Modal */}
       <Modal
         isOpen={promoModal}
         onClose={() => setPromoModal(false)}
-        title="Change Employee Role"
+        title="Manage Role & Department"
         size="sm"
       >
         {selectedEmployee && (
@@ -238,11 +289,23 @@ export default function EmployeeDirectoryTab() {
 
             <Select
               id="new-role"
-              label="New Role"
+              label="Role"
               options={PROMOTABLE_ROLES.map((r) => ({ value: r, label: r }))}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
               placeholder="Select a role"
+            />
+
+            <Select
+              id="new-dept"
+              label="Department"
+              options={[
+                { value: '', label: '— No Department —' },
+                ...departments.map((d) => ({ value: d.id, label: d.name })),
+              ]}
+              value={newDeptId}
+              onChange={(e) => setNewDeptId(e.target.value)}
+              placeholder="Select a department"
             />
 
             <div className="flex justify-end gap-3 pt-2">
@@ -254,7 +317,7 @@ export default function EmployeeDirectoryTab() {
                 loading={promoting}
                 onClick={handlePromotion}
               >
-                Assign Role
+                Save Changes
               </Button>
             </div>
           </div>

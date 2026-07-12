@@ -27,6 +27,7 @@ const categoryRoutes = require('./src/routes/categories.routes');
 const employeeRoutes = require('./src/routes/employees.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
 const activityLogRoutes = require('./src/routes/activityLogs.routes');
+const notificationsRoutes = require('./src/routes/notifications.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -65,6 +66,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // ── 404 Handler ─────────────────────────────────────────────
 app.use((_req, res) => {

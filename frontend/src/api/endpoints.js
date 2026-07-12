@@ -322,17 +322,17 @@ export const employeesApi = {
     return res.data;
   },
 
-  async updateRole(id, role) {
+  async updateRole(id, role, departmentId) {
     if (USE_MOCKS) {
       await delay(500);
       _mockEmps = _mockEmps.map((e) =>
-        e.id === id ? { ...e, role } : e
+        e.id === id ? { ...e, role, departmentId } : e
       );
       const updated = _mockEmps.find((e) => e.id === id);
       return { success: true, data: updated, error: null };
     }
-    // PATCH — only endpoint in the system that changes a user's role
-    const res = await client.patch(`/employees/${id}/role`, { role });
+    // PATCH — updates a user's role and/or department
+    const res = await client.patch(`/employees/${id}/role`, { role, departmentId });
     return res.data;
   },
 

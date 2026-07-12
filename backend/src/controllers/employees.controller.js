@@ -107,7 +107,7 @@ async function getAll(req, res) {
 async function updateRole(req, res) {
   try {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, departmentId } = req.body;
 
     if (!role) {
       return res.status(400).json({ success: false, data: null, error: 'Role is required' });
@@ -135,11 +135,55 @@ async function updateRole(req, res) {
       return res.status(400).json({ success: false, data: null, error: 'You cannot change your own role' });
     }
 
+    let targetDeptId = user.department_id;
+    if (departmentId !== undefined) {
+      targetDeptId = departmentId || null;
+    }
+
+    if ((normalizedRole === 'department_head' || normalizedRole === 'asset_manager') && targetDeptId) {
+      const existingCheck = await db.query(
+        `SELECT u.name, u.role, d.name as dept_name
+         FROM users u
+         LEFT JOIN departments d ON u.department_id = d.id
+         WHERE u.role = $1 AND u.department_id = $2 AND u.is_active = true AND u.id != $3`,
+        [normalizedRole, targetDeptId, id]
+      );
+      if (existingCheck.rows.length > 0) {
+        const roleLabel = normalizedRole === 'department_head' ? 'Department Head' : 'Asset Manager';
+        const deptName = existingCheck.rows[0].dept_name || 'this department';
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: `${deptName} already has an active ${roleLabel} (${existingCheck.rows[0].name}). Deactivate or reassign them before assigning another.`
+        });
+      }
+    } else if (normalizedRole === 'asset_manager' && !targetDeptId) {
+      const existingCheck = await db.query(
+        `SELECT u.name
+         FROM users u
+         WHERE u.role = 'asset_manager' AND u.department_id IS NULL AND u.is_active = true AND u.id != $1`,
+        [id]
+      );
+      if (existingCheck.rows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: `There is already an active organization-wide Asset Manager (${existingCheck.rows[0].name}). Deactivate or reassign them before assigning another.`
+        });
+      }
+    }
+
     const result = await db.query(
-      `UPDATE users SET role = $1 WHERE id = $2
+      `UPDATE users SET role = $1, department_id = $2 WHERE id = $3
        RETURNING id, name, email, role, department_id, is_active, created_at, updated_at`,
-      [normalizedRole, id]
+      [normalizedRole, targetDeptId, id]
     );
+
+    if (normalizedRole === 'department_head' && targetDeptId) {
+      await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [id, targetDeptId]);
+    } else if (user.role === 'department_head') {
+      await db.query('UPDATE departments SET department_head_id = NULL WHERE department_head_id = $1 AND id != COALESCE($2, id)', [id, targetDeptId]);
+    }
 
     await logActivity({
       userId: req.user.id,
@@ -190,6 +234,17 @@ async function deactivate(req, res) {
       'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, name, email, role, is_active',
       [newStatus, id]
     );
+
+    if (existing.rows[0].role === 'department_head') {
+      if (!newStatus) {
+        await db.query('UPDATE departments SET department_head_id = NULL WHERE department_head_id = $1', [id]);
+      } else if (existing.rows[0].department_id) {
+        const checkCurrentHead = await db.query('SELECT department_head_id FROM departments WHERE id = $1', [existing.rows[0].department_id]);
+        if (checkCurrentHead.rows.length > 0 && !checkCurrentHead.rows[0].department_head_id) {
+          await db.query('UPDATE departments SET department_head_id = $1 WHERE id = $2', [id, existing.rows[0].department_id]);
+        }
+      }
+    }
 
     const statusText = newStatus ? 'activated' : 'deactivated';
     await logActivity({

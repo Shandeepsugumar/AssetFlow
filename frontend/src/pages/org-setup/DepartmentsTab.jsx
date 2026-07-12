@@ -14,7 +14,6 @@ export default function DepartmentsTab() {
   const [form, setForm] = useState({
     name: '',
     description: '',
-    headId: '',
     parentId: '',
   });
   const [saving, setSaving] = useState(false);
@@ -41,7 +40,7 @@ export default function DepartmentsTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', description: '', headId: '', parentId: '' });
+    setForm({ name: '', description: '', parentId: '' });
     setModalOpen(true);
   };
 
@@ -50,7 +49,6 @@ export default function DepartmentsTab() {
     setForm({
       name: dept.name,
       description: dept.description || '',
-      headId: dept.headId || '',
       parentId: dept.parentId || '',
     });
     setModalOpen(true);
@@ -68,15 +66,20 @@ export default function DepartmentsTab() {
         if (res.success) {
           toast.success('Department updated');
           fetchData();
+          setModalOpen(false);
+        } else {
+          toast.error(res.error || 'Failed to update department');
         }
       } else {
         const res = await departmentsApi.create(form);
         if (res.success) {
           toast.success('Department created');
           fetchData();
+          setModalOpen(false);
+        } else {
+          toast.error(res.error || 'Failed to create department');
         }
       }
-      setModalOpen(false);
     } catch {
       toast.error('Failed to save department');
     } finally {
@@ -97,11 +100,6 @@ export default function DepartmentsTab() {
       toast.error('Failed to update status');
     }
   };
-
-  const headOptions = employees.map((e) => ({
-    value: e.id,
-    label: `${e.name} (${e.role})`,
-  }));
 
   const parentOptions = departments
     .filter((d) => !editing || d.id !== editing.id)
@@ -167,7 +165,7 @@ export default function DepartmentsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">
-          Manage organizational departments and assign heads.
+          Create unique departments with descriptions and hierarchy. Assign department heads via the Employee Directory.
         </p>
         <Button variant="primary" size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4" />
@@ -203,14 +201,6 @@ export default function DepartmentsTab() {
             placeholder="Brief description of the department"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          <Select
-            id="dept-head"
-            label="Department Head"
-            options={headOptions}
-            placeholder="Select a department head"
-            value={form.headId}
-            onChange={(e) => setForm({ ...form, headId: e.target.value })}
           />
           <Select
             id="dept-parent"

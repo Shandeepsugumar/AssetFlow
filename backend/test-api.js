@@ -5,6 +5,7 @@
  */
 
 const BASE = 'http://localhost:5000/api';
+const db = require('./src/config/db');
 let passed = 0;
 let failed = 0;
 let adminToken = '';
@@ -38,6 +39,9 @@ async function run() {
   console.log('\n═══════════════════════════════════════════');
   console.log('  AssetFlow API End-to-End Tests');
   console.log('═══════════════════════════════════════════\n');
+
+  await db.query("DELETE FROM departments WHERE name LIKE 'Test Department%'");
+  await db.query("DELETE FROM asset_categories WHERE name LIKE 'Test Category%'");
 
   // ── HEALTH ────────────────────────────────────────
   console.log('▸ Health');
@@ -209,11 +213,15 @@ async function run() {
   check('Unknown routes return 404', notFound.status === 404);
 
   // ── SUMMARY ───────────────────────────────────────
+  await db.query("DELETE FROM departments WHERE name LIKE 'Test Department%'");
+  await db.query("DELETE FROM asset_categories WHERE name LIKE 'Test Category%'");
+
   const total = passed + failed;
   console.log('\n═══════════════════════════════════════════');
   console.log(`  Results: ${passed}/${total} passed, ${failed} failed`);
   console.log('═══════════════════════════════════════════\n');
   if (failed > 0) process.exit(1);
+  process.exit(0);
 }
 
 run().catch(err => {

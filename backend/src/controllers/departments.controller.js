@@ -21,10 +21,17 @@ async function getAll(req, res) {
     const result = await db.query(
       `SELECT d.*,
               pd.name AS parent_name,
-              u.name AS head_name
+              COALESCE(u.name, u_role.name) AS head_name,
+              COALESCE(d.department_head_id, u_role.id) AS computed_head_id
        FROM departments d
        LEFT JOIN departments pd ON d.parent_department_id = pd.id
        LEFT JOIN users u ON d.department_head_id = u.id
+       LEFT JOIN (
+         SELECT DISTINCT ON (department_id) id, name, department_id
+         FROM users
+         WHERE role = 'department_head' AND is_active = true AND department_id IS NOT NULL
+         ORDER BY department_id, created_at ASC
+       ) u_role ON u_role.department_id = d.id
        ORDER BY d.name ASC`
     );
 
@@ -43,7 +50,7 @@ async function getAll(req, res) {
       id: d.id,
       name: d.name,
       description: d.description,
-      headId: d.department_head_id,
+      headId: d.computed_head_id || d.department_head_id,
       headName: d.head_name,
       parentId: d.parent_department_id,
       parentName: d.parent_name,
@@ -70,6 +77,11 @@ async function create(req, res) {
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, data: null, error: 'Department name is required' });
+    }
+
+    const dupCheck = await db.query('SELECT id FROM departments WHERE LOWER(name) = LOWER($1)', [name.trim()]);
+    if (dupCheck.rows.length > 0) {
+      return res.status(400).json({ success: false, data: null, error: 'A department with this name already exists' });
     }
 
     // Validate head exists if provided
@@ -121,7 +133,7 @@ async function update(req, res) {
     const { name, description, headId, parentId } = req.body;
 
     // Check department exists
-    const existing = await db.query('SELECT id FROM departments WHERE id = $1', [id]);
+    const existing = await db.query('SELECT * FROM departments WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, data: null, error: 'Department not found' });
     }
@@ -130,17 +142,24 @@ async function update(req, res) {
       return res.status(400).json({ success: false, data: null, error: 'Department name is required' });
     }
 
+    const dupCheck = await db.query('SELECT id FROM departments WHERE LOWER(name) = LOWER($1) AND id != $2', [name.trim(), id]);
+    if (dupCheck.rows.length > 0) {
+      return res.status(400).json({ success: false, data: null, error: 'A department with this name already exists' });
+    }
+
     // Prevent self-referencing parent
     if (parentId && parentId === id) {
       return res.status(400).json({ success: false, data: null, error: 'A department cannot be its own parent' });
     }
+
+    const targetHeadId = headId !== undefined && headId !== '' ? headId : existing.rows[0].department_head_id;
 
     const result = await db.query(
       `UPDATE departments
        SET name = $1, description = $2, department_head_id = $3, parent_department_id = $4
        WHERE id = $5
        RETURNING *`,
-      [name.trim(), description || '', headId || null, parentId || null, id]
+      [name.trim(), description || '', targetHeadId || null, parentId || null, id]
     );
 
     await logActivity({
