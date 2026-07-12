@@ -90,30 +90,30 @@ export default function Login() {
               error={errors.email}
             />
 
-            <div>
-              <Input
-                id="login-password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Enter your password"
-                icon={Lock}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                error={errors.password}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-9 text-text-tertiary hover:text-text-primary cursor-pointer"
-                style={{ position: 'relative', float: 'right', marginTop: '-36px', marginRight: '8px' }}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4.5 w-4.5" />
-                ) : (
-                  <Eye className="h-4.5 w-4.5" />
-                )}
-              </button>
-            </div>
+            <Input
+              id="login-password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
+              icon={Lock}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              error={errors.password}
+              suffix={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-text-tertiary hover:text-text-primary focus:outline-none cursor-pointer flex items-center justify-center p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4.5 w-4.5" />
+                  ) : (
+                    <Eye className="h-4.5 w-4.5" />
+                  )}
+                </button>
+              }
+            />
 
             <div className="flex items-center justify-end">
               <Link
