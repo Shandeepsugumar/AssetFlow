@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import client from '../../api/client';
-import useAuth from '../../hooks/useAuth';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AuditScreen() {
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
+  const canManage = user && ['Admin', 'Asset Manager', 'admin', 'asset_manager'].includes(user.role);
   
   // Views: 'list', 'create', 'session'
   const [view, setView] = useState('list');
@@ -125,7 +126,7 @@ export default function AuditScreen() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">Audit Cycles</h1>
             <p className="text-sm text-slate-500">Manage and track asset verification cycles.</p>
           </div>
-          {hasRole(['admin', 'asset_manager']) && (
+          {canManage && (
             <button
               onClick={() => setView('create')}
               className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-slate-900 transition-colors"
@@ -302,7 +303,7 @@ export default function AuditScreen() {
           )}
         </div>
 
-        {activeCycle.status === 'Active' && hasRole(['admin', 'asset_manager']) && (
+        {activeCycle.status === 'Active' && canManage && (
           <button onClick={handleCloseCycle} className="w-full py-3 bg-black hover:bg-slate-900 text-white font-medium text-sm rounded shadow uppercase tracking-wider disabled:opacity-50">
             Close Cycle ({flaggedAssets.length} Discrepancies)
           </button>
