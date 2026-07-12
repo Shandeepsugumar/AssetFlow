@@ -77,6 +77,12 @@
   box-sizing: border-box;
 }
 
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--color-text-primary);
