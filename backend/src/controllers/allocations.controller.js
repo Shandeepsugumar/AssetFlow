@@ -140,15 +140,15 @@ async function getAll(req, res) {
     const params = [];
     let idx = 1;
 
-    if (status) {
+    if (status && status !== 'undefined' && status !== 'null') {
       query += ` AND al.status = $${idx++}`;
       params.push(status);
     }
-    if (asset_id) {
+    if (asset_id && asset_id !== 'undefined' && asset_id !== 'null') {
       query += ` AND al.asset_id = $${idx++}`;
       params.push(asset_id);
     }
-    if (user_id) {
+    if (user_id && user_id !== 'undefined' && user_id !== 'null') {
       query += ` AND al.allocated_to_user = $${idx++}`;
       params.push(user_id);
     }

@@ -56,23 +56,23 @@ async function getAll(req, res) {
     const params = [];
     let idx = 1;
 
-    if (is_bookable !== undefined) {
+    if (is_bookable !== undefined && is_bookable !== 'undefined') {
       query += ` AND a.is_bookable = $${idx++}`;
       params.push(is_bookable === 'true');
     }
-    if (status) {
+    if (status && status !== 'undefined' && status !== 'null') {
       query += ` AND a.status = $${idx++}`;
       params.push(status);
     }
-    if (category_id) {
+    if (category_id && category_id !== 'undefined' && category_id !== 'null') {
       query += ` AND a.category_id = $${idx++}`;
       params.push(category_id);
     }
-    if (department_id) {
+    if (department_id && department_id !== 'undefined' && department_id !== 'null') {
       query += ` AND a.department_id = $${idx++}`;
       params.push(department_id);
     }
-    if (search) {
+    if (search && search !== 'undefined' && search !== 'null') {
       query += ` AND (a.name ILIKE $${idx} OR a.asset_tag ILIKE $${idx} OR a.serial_number ILIKE $${idx} OR a.location ILIKE $${idx})`;
       params.push(`%${search}%`);
       idx++;
