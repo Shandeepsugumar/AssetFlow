@@ -34,25 +34,25 @@ async function getAll(req, res) {
     const params = [];
     let paramIdx = 1;
 
-    if (search) {
+    if (search && search !== 'undefined' && search !== 'null') {
       query += ` AND (u.name ILIKE $${paramIdx} OR u.email ILIKE $${paramIdx})`;
       params.push(`%${search}%`);
       paramIdx++;
     }
 
-    if (department) {
+    if (department && department !== 'undefined' && department !== 'null') {
       query += ` AND d.name = $${paramIdx}`;
       params.push(department);
       paramIdx++;
     }
 
-    if (role) {
+    if (role && role !== 'undefined' && role !== 'null') {
       query += ` AND u.role = $${paramIdx}`;
       params.push(role.toLowerCase().replace(/ /g, '_'));
       paramIdx++;
     }
 
-    if (status) {
+    if (status && status !== 'undefined' && status !== 'null') {
       const isActive = status.toLowerCase() === 'active';
       query += ` AND u.is_active = $${paramIdx}`;
       params.push(isActive);
