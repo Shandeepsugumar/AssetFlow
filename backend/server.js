@@ -1,21 +1,15 @@
-/**
- * ============================================================
- * AssetFlow — Express Server Entry Point
- * ============================================================
- * Starts the API server with all routes mounted.
- *
- * Default: http://localhost:5000/api
- *
- * Setup:
- *   1. Create PostgreSQL database: CREATE DATABASE assetflow;
- *   2. Copy .env.example to .env and configure
- *   3. npm run db:migrate   (creates tables)
- *   4. npm run db:seed      (seeds default admin + sample data)
- *   5. npm run dev           (starts server with --watch)
- * ============================================================
- */
-
 require('dotenv').config();
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
 const express = require('express');
 const cors = require('cors');
 const errorHandler = require('./src/middleware/errorHandler');
@@ -136,14 +130,25 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // ── Start Server ────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`
+// Verify DB connectivity before binding to port — fail fast with clear message
+const db = require('./src/config/db');
+db.query('SELECT 1')
+  .then(() => {
+    console.log('[DB] Database connection verified.');
+    app.listen(PORT, () => {
+      console.log(`
   ╔══════════════════════════════════════════════╗
   ║   AssetFlow API Server                       ║
   ║   Running on http://localhost:${PORT}/api       ║
   ║   Environment: ${process.env.NODE_ENV || 'development'}                  ║
   ╚══════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+  })
+  .catch((err) => {
+    console.error('[FATAL] Cannot connect to database:', err.message);
+    console.error('DATABASE_URL set?', !!process.env.DATABASE_URL);
+    process.exit(1);
+  });
 
 module.exports = app;
