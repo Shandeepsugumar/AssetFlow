@@ -131,13 +131,17 @@ async function create(req, res) {
       ? `/uploads/${req.files.document[0].filename}`
       : null;
 
+    // Generate random asset tag (e.g. AST-7B93A)
+    const assetTag = `AST-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
     const result = await db.query(
       `INSERT INTO assets
-         (name, category_id, serial_number, acquisition_date, acquisition_cost,
+         (asset_tag, name, category_id, serial_number, acquisition_date, acquisition_cost,
           condition, location, department_id, is_bookable, photo_url, document_url, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'Available')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Available')
        RETURNING *`,
       [
+        assetTag,
         name,
         categoryId || null,
         serialNumber || null,
