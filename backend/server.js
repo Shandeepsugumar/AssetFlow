@@ -130,25 +130,90 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // ── Start Server ────────────────────────────────────────────
-// Verify DB connectivity before binding to port — fail fast with clear message
+// In production: auto-run migrations so Render always has all tables.
+// In development: just verify connectivity.
 const db = require('./src/config/db');
-db.query('SELECT 1')
-  .then(() => {
-    console.log('[DB] Database connection verified.');
-    app.listen(PORT, () => {
-      console.log(`
+const fs = require('path');
+
+async function startServer() {
+  // 1. Verify DB connectivity
+  await db.query('SELECT 1');
+  console.log('[DB] Database connection verified.');
+
+  // 2. Auto-migrate in production (idempotent — CREATE IF NOT EXISTS)
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const schemaPath = require('path').join(__dirname, 'src/db/schema.sql');
+      const sql = require('fs').readFileSync(schemaPath, 'utf8');
+      await db.query(sql);
+      console.log('[DB] Schema migration applied.');
+
+      // Also apply audit tables migration
+      const auditSql = `
+        CREATE TABLE IF NOT EXISTS audit_cycles (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(255) NOT NULL,
+          department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+          scope_location VARCHAR(255),
+          status VARCHAR(50) NOT NULL DEFAULT 'Active',
+          start_date DATE,
+          end_date DATE,
+          created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS audit_cycle_auditors (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          cycle_id UUID NOT NULL REFERENCES audit_cycles(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(cycle_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS audit_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          cycle_id UUID NOT NULL REFERENCES audit_cycles(id) ON DELETE CASCADE,
+          asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+          asset_tag VARCHAR(100),
+          asset_name VARCHAR(255),
+          expected_location VARCHAR(255),
+          verification_status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+          notes TEXT,
+          verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
+          verified_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(255) NOT NULL UNIQUE,
+          expires_at TIMESTAMPTZ NOT NULL,
+          used BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `;
+      await db.query(auditSql);
+      console.log('[DB] Audit tables ensured.');
+    } catch (migErr) {
+      console.error('[DB] Migration warning (non-fatal):', migErr.message);
+    }
+  }
+
+  // 3. Start listening
+  app.listen(PORT, () => {
+    console.log(`
   ╔══════════════════════════════════════════════╗
   ║   AssetFlow API Server                       ║
   ║   Running on http://localhost:${PORT}/api       ║
   ║   Environment: ${process.env.NODE_ENV || 'development'}                  ║
   ╚══════════════════════════════════════════════╝
-      `);
-    });
-  })
-  .catch((err) => {
-    console.error('[FATAL] Cannot connect to database:', err.message);
-    console.error('DATABASE_URL set?', !!process.env.DATABASE_URL);
-    process.exit(1);
+    `);
   });
+}
+
+startServer().catch((err) => {
+  console.error('[FATAL] Cannot connect to database:', err.message);
+  console.error('DATABASE_URL set?', !!process.env.DATABASE_URL);
+  process.exit(1);
+});
 
 module.exports = app;
+
