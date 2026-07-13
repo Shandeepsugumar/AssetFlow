@@ -39,9 +39,49 @@ const auditsRoutes = require('./src/routes/audits.routes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Middleware ───────────────────────────────────────────────
+// ── CORS ─────────────────────────────────────────────────────
+// Allowed origins: local dev + production Vercel frontend
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://asset-flow-nu.vercel.app',
+];
+
+// Safety-net: inject CORS headers on every response BEFORE any other middleware.
+// This ensures headers are present even if a later middleware throws and the
+// cors() package never gets a chance to set them (e.g. Render cold-start crash).
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // Same-origin or server-to-server — allow
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS'
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type,Authorization,X-Requested-With,Accept,Origin'
+  );
+  // Short-circuit preflight immediately — no further processing needed
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 const corsOptions = {
-  origin: true, // Dynamically reflect any request origin (localhost, Vercel, Render)
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
